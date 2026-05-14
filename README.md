@@ -17,4 +17,6 @@ xdg-open index.html   # Linux
 
 ## Storage
 
-Player profiles and the leaderboard live in `localStorage`, so progress is per-browser/per-device. Keys: `mq:player:<NAME>`, `mq:leaderboard`.
+Player profiles live in `localStorage` (per-browser/per-device), keyed `mq:player:<NAME>`.
+
+The leaderboard is shared globally via Firebase Firestore (project `fun-tools-mg`, collection `leaderboard`, doc id = URL-encoded player name). A copy of the most recent fetch is cached in `localStorage` under `mq:leaderboard` so the Hall of Fame still renders when offline.

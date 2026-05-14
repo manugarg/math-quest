@@ -841,7 +841,11 @@ function normalize(s) {
    ========================================================= */
 
 const STORAGE_PLAYER_PREFIX = 'mq:player:';
-const STORAGE_LB_KEY = 'mq:leaderboard';
+const STORAGE_LB_KEY = 'mq:leaderboard'; // local cache of remote leaderboard
+
+const FIREBASE_PROJECT_ID = 'fun-tools-mg';
+const FIREBASE_API_KEY = 'AIzaSyDofCu66n4Byq1p9bVLsfXqg_AtN3Yh1n8';
+const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents`;
 
 const state = {
   player: null, // { name, xp, best, solved, achievements: [] }
@@ -874,23 +878,65 @@ async function savePlayer() {
 
 async function loadLeaderboard() {
   try {
-    const v = localStorage.getItem(STORAGE_LB_KEY);
-    if (v) return JSON.parse(v);
-  } catch (e) { /* empty */ }
-  return [];
+    const r = await fetch(`${FIRESTORE_BASE}:runQuery?key=${FIREBASE_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: 'leaderboard' }],
+          orderBy: [{ field: { fieldPath: 'xp' }, direction: 'DESCENDING' }],
+          limit: 20
+        }
+      })
+    });
+    if (!r.ok) throw new Error('runQuery ' + r.status);
+    const rows = await r.json();
+    const lb = rows
+      .filter(row => row.document)
+      .map(row => {
+        const f = row.document.fields;
+        return {
+          name: f.name?.stringValue || '?',
+          xp: parseInt(f.xp?.integerValue || '0', 10),
+          best: parseInt(f.best?.integerValue || '0', 10)
+        };
+      });
+    try { localStorage.setItem(STORAGE_LB_KEY, JSON.stringify(lb)); } catch (_) {}
+    return lb;
+  } catch (e) {
+    console.warn('Leaderboard fetch failed, using cache', e);
+    try {
+      const v = localStorage.getItem(STORAGE_LB_KEY);
+      if (v) return JSON.parse(v);
+    } catch (_) {}
+    return [];
+  }
 }
 
 async function updateLeaderboard() {
+  const p = state.player;
+  const docId = encodeURIComponent(p.name);
+  const body = {
+    fields: {
+      name:      { stringValue: p.name },
+      xp:        { integerValue: String(p.xp) },
+      best:      { integerValue: String(p.best) },
+      solved:    { integerValue: String(p.solved) },
+      updatedAt: { timestampValue: new Date().toISOString() }
+    }
+  };
   try {
-    let lb = await loadLeaderboard();
-    const existing = lb.findIndex(e => e.name === state.player.name);
-    const entry = { name: state.player.name, xp: state.player.xp, best: state.player.best };
-    if (existing >= 0) lb[existing] = entry;
-    else lb.push(entry);
-    lb.sort((a, b) => b.xp - a.xp);
-    lb = lb.slice(0, 20);
-    localStorage.setItem(STORAGE_LB_KEY, JSON.stringify(lb));
-  } catch (e) { console.error(e); }
+    const r = await fetch(`${FIRESTORE_BASE}/leaderboard/${docId}?key=${FIREBASE_API_KEY}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!r.ok) {
+      console.warn('Firestore write failed:', r.status, await r.text());
+    }
+  } catch (e) {
+    console.warn('Firestore write failed', e);
+  }
 }
 
 /* =========================================================
