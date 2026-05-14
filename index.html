@@ -1,0 +1,1253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DISTRIBUTE — A Math Quest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=Space+Mono:wght@400;700&family=Bungee&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e27;
+    --bg-2: #131736;
+    --neon: #00ffaa;
+    --neon-2: #ff2e93;
+    --neon-3: #ffe600;
+    --neon-4: #00d4ff;
+    --danger: #ff2e2e;
+    --muted: #6c7293;
+    --card: rgba(255,255,255,0.04);
+    --border: rgba(0,255,170,0.25);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Space Mono', monospace;
+    background: var(--bg);
+    color: #fff;
+    overflow-x: hidden;
+    background-image:
+      radial-gradient(circle at 20% 10%, rgba(0,255,170,0.08), transparent 40%),
+      radial-gradient(circle at 80% 80%, rgba(255,46,147,0.08), transparent 40%),
+      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+    min-height: 100vh;
+  }
+  .scanlines::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(
+      0deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 1px,
+      transparent 1px, transparent 3px);
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.4;
+  }
+  .container {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 20px;
+    position: relative;
+    z-index: 2;
+  }
+  /* Header / HUD */
+  .hud {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 18px;
+    border: 2px solid var(--neon);
+    background: rgba(0,255,170,0.05);
+    box-shadow: 0 0 20px rgba(0,255,170,0.15), inset 0 0 20px rgba(0,255,170,0.05);
+    margin-bottom: 24px;
+    border-radius: 4px;
+  }
+  .hud-left { display: flex; align-items: center; gap: 14px; }
+  .hud-avatar {
+    width: 36px; height: 36px;
+    background: var(--neon);
+    color: var(--bg);
+    display: grid; place-items: center;
+    font-family: 'Bungee', cursive;
+    font-size: 18px;
+    border-radius: 2px;
+  }
+  .hud-name { font-weight: 700; font-size: 14px; letter-spacing: 1px; }
+  .hud-stats { display: flex; gap: 18px; font-size: 12px; }
+  .stat { text-align: right; }
+  .stat-label { color: var(--muted); font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; }
+  .stat-value { font-family: 'VT323', monospace; font-size: 22px; color: var(--neon-3); line-height: 1; }
+  .stat-value.pink { color: var(--neon-2); }
+  .stat-value.cyan { color: var(--neon-4); }
+
+  /* Titles */
+  h1.title {
+    font-family: 'Bungee', cursive;
+    font-size: clamp(38px, 8vw, 64px);
+    line-height: 0.95;
+    text-align: center;
+    margin: 30px 0 6px;
+    color: var(--neon);
+    text-shadow:
+      4px 4px 0 var(--neon-2),
+      8px 8px 0 rgba(0,0,0,0.4);
+    letter-spacing: 2px;
+  }
+  .subtitle {
+    text-align: center;
+    color: var(--muted);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    font-size: 12px;
+    margin-bottom: 30px;
+  }
+  .subtitle .blink {
+    color: var(--neon-3);
+    animation: blink 1s steps(2) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* Cards */
+  .card {
+    background: var(--card);
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    padding: 26px;
+    margin-bottom: 20px;
+    backdrop-filter: blur(6px);
+  }
+  .card.glow {
+    box-shadow: 0 0 30px rgba(0,255,170,0.15), inset 0 0 0 1px rgba(0,255,170,0.1);
+  }
+
+  /* Buttons */
+  .btn {
+    font-family: 'Bungee', cursive;
+    font-size: 16px;
+    padding: 14px 24px;
+    border: 2px solid var(--neon);
+    background: transparent;
+    color: var(--neon);
+    cursor: pointer;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    transition: all 0.15s;
+    position: relative;
+    border-radius: 2px;
+    min-height: 52px;
+  }
+  .btn:hover {
+    background: var(--neon);
+    color: var(--bg);
+    box-shadow: 0 0 20px var(--neon);
+    transform: translate(-2px, -2px);
+  }
+  .btn:active { transform: translate(0, 0); }
+  .btn.pink { border-color: var(--neon-2); color: var(--neon-2); }
+  .btn.pink:hover { background: var(--neon-2); color: var(--bg); box-shadow: 0 0 20px var(--neon-2); }
+  .btn.cyan { border-color: var(--neon-4); color: var(--neon-4); }
+  .btn.cyan:hover { background: var(--neon-4); color: var(--bg); box-shadow: 0 0 20px var(--neon-4); }
+  .btn.yellow { border-color: var(--neon-3); color: var(--neon-3); }
+  .btn.yellow:hover { background: var(--neon-3); color: var(--bg); box-shadow: 0 0 20px var(--neon-3); }
+  .btn.ghost { border-color: var(--muted); color: var(--muted); font-size: 12px; padding: 8px 14px; min-height: auto; }
+  .btn.ghost:hover { background: var(--muted); color: var(--bg); box-shadow: none; }
+  .btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  /* Inputs */
+  .input {
+    width: 100%;
+    padding: 14px 18px;
+    background: rgba(0,0,0,0.4);
+    border: 2px solid var(--border);
+    color: #fff;
+    font-family: 'Space Mono', monospace;
+    font-size: 18px;
+    border-radius: 2px;
+    outline: none;
+    transition: all 0.15s;
+  }
+  .input:focus { border-color: var(--neon-3); box-shadow: 0 0 15px rgba(255,230,0,0.2); }
+  .input.big {
+    font-family: 'VT323', monospace;
+    font-size: 32px;
+    text-align: center;
+    letter-spacing: 2px;
+  }
+
+  /* Mode selector */
+  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .mode-card {
+    border: 2px solid var(--border);
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-radius: 4px;
+    background: rgba(0,0,0,0.2);
+  }
+  .mode-card:hover { transform: translateY(-4px); }
+  .mode-card.classic:hover { border-color: var(--neon); box-shadow: 0 8px 30px rgba(0,255,170,0.2); }
+  .mode-card.timed:hover { border-color: var(--neon-3); box-shadow: 0 8px 30px rgba(255,230,0,0.2); }
+  .mode-card.error:hover { border-color: var(--neon-2); box-shadow: 0 8px 30px rgba(255,46,147,0.2); }
+  .mode-card.boss:hover { border-color: var(--neon-4); box-shadow: 0 8px 30px rgba(0,212,255,0.2); }
+  .mode-icon { font-family: 'Bungee', cursive; font-size: 28px; margin-bottom: 8px; }
+  .mode-card.classic .mode-icon { color: var(--neon); }
+  .mode-card.timed .mode-icon { color: var(--neon-3); }
+  .mode-card.error .mode-icon { color: var(--neon-2); }
+  .mode-card.boss .mode-icon { color: var(--neon-4); }
+  .mode-title { font-family: 'Bungee', cursive; font-size: 14px; letter-spacing: 1px; margin-bottom: 6px; }
+  .mode-desc { color: var(--muted); font-size: 11px; line-height: 1.5; }
+
+  /* Question */
+  .question-area { text-align: center; padding: 20px 0; }
+  .q-meta {
+    font-family: 'VT323', monospace;
+    color: var(--muted);
+    letter-spacing: 3px;
+    font-size: 16px;
+    margin-bottom: 10px;
+  }
+  .q-text {
+    font-family: 'VT323', monospace;
+    font-size: clamp(36px, 8vw, 56px);
+    color: var(--neon-3);
+    margin: 16px 0 24px;
+    line-height: 1.2;
+    text-shadow: 0 0 20px rgba(255,230,0,0.3);
+    word-break: break-word;
+  }
+  .q-hint {
+    color: var(--muted);
+    font-size: 13px;
+    margin-bottom: 18px;
+    font-style: italic;
+  }
+  .answer-row {
+    display: flex;
+    gap: 10px;
+    align-items: stretch;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+  .answer-row .input { flex: 1; }
+  .timer-bar {
+    height: 8px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 20px;
+    border: 1px solid var(--border);
+  }
+  .timer-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--neon), var(--neon-3), var(--neon-2));
+    transition: width 0.1s linear;
+  }
+
+  /* Feedback */
+  .feedback {
+    text-align: center;
+    padding: 16px;
+    border-radius: 4px;
+    margin-top: 16px;
+    font-family: 'Bungee', cursive;
+    letter-spacing: 2px;
+    font-size: 14px;
+    animation: pop 0.3s ease;
+  }
+  @keyframes pop {
+    0% { transform: scale(0.8); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  .feedback.good {
+    background: rgba(0,255,170,0.1);
+    border: 2px solid var(--neon);
+    color: var(--neon);
+  }
+  .feedback.bad {
+    background: rgba(255,46,46,0.1);
+    border: 2px solid var(--danger);
+    color: var(--danger);
+  }
+  .feedback-detail {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    margin-top: 8px;
+    color: var(--muted);
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .feedback-detail span.eq { color: var(--neon-3); font-family: 'VT323', monospace; font-size: 18px; }
+
+  /* Find the error mode */
+  .error-steps {
+    text-align: left;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid var(--border);
+    padding: 16px;
+    margin: 18px 0;
+    border-radius: 4px;
+    font-family: 'VT323', monospace;
+    font-size: 22px;
+    line-height: 2;
+  }
+  .step {
+    padding: 8px 14px;
+    margin: 4px 0;
+    cursor: pointer;
+    border-radius: 2px;
+    border: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .step:hover { background: rgba(255,46,147,0.08); border-color: rgba(255,46,147,0.3); }
+  .step.selected { border-color: var(--neon-2); background: rgba(255,46,147,0.15); }
+  .step.correct { border-color: var(--neon); background: rgba(0,255,170,0.15); }
+  .step.wrong { border-color: var(--danger); background: rgba(255,46,46,0.15); }
+  .step-num { color: var(--muted); margin-right: 12px; font-size: 14px; }
+
+  /* Game over / level up */
+  .modal {
+    text-align: center;
+    padding: 30px;
+  }
+  .big-score {
+    font-family: 'Bungee', cursive;
+    font-size: 72px;
+    color: var(--neon-3);
+    text-shadow: 4px 4px 0 var(--neon-2);
+    margin: 20px 0;
+  }
+  .level-badge {
+    display: inline-block;
+    font-family: 'Bungee', cursive;
+    background: var(--neon);
+    color: var(--bg);
+    padding: 8px 18px;
+    border-radius: 2px;
+    letter-spacing: 2px;
+    margin: 8px 4px;
+  }
+  .achievement {
+    display: inline-block;
+    padding: 6px 12px;
+    margin: 4px;
+    border: 1px solid var(--neon-3);
+    color: var(--neon-3);
+    font-size: 11px;
+    letter-spacing: 1px;
+    border-radius: 2px;
+  }
+
+  /* Leaderboard */
+  .lb-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-family: 'VT323', monospace;
+    font-size: 20px;
+  }
+  .lb-row.me { color: var(--neon-3); }
+  .lb-rank { color: var(--muted); width: 40px; }
+  .lb-name { flex: 1; }
+  .lb-score { color: var(--neon); }
+
+  /* Utils */
+  .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 20px; }
+  .center { text-align: center; }
+  .hidden { display: none !important; }
+  .small { font-size: 12px; color: var(--muted); }
+
+  /* Floating points animation */
+  @keyframes floatUp {
+    0% { transform: translateY(0); opacity: 1; }
+    100% { transform: translateY(-80px); opacity: 0; }
+  }
+  .float-points {
+    position: fixed;
+    font-family: 'Bungee', cursive;
+    font-size: 32px;
+    color: var(--neon-3);
+    pointer-events: none;
+    animation: floatUp 1s ease-out forwards;
+    text-shadow: 0 0 20px var(--neon-3);
+    z-index: 999;
+  }
+
+  /* Streak fire */
+  .streak {
+    display: inline-block;
+    margin-left: 6px;
+    color: var(--neon-2);
+    font-family: 'Bungee', cursive;
+    animation: pulse 0.6s ease infinite alternate;
+  }
+  @keyframes pulse { to { transform: scale(1.15); text-shadow: 0 0 20px var(--neon-2); } }
+
+  @media (max-width: 600px) {
+    .modes { grid-template-columns: 1fr; }
+    .hud { flex-direction: column; gap: 10px; align-items: flex-start; }
+    .hud-stats { width: 100%; justify-content: space-between; }
+  }
+</style>
+</head>
+<body class="scanlines">
+<div class="container">
+
+  <!-- SIGN UP SCREEN -->
+  <div id="signup-screen">
+    <h1 class="title">DISTRIBUTE</h1>
+    <p class="subtitle">A Math Quest <span class="blink">▮</span></p>
+
+    <div class="card glow">
+      <p class="small center" style="margin-bottom: 18px; letter-spacing: 2px;">[ ENTER PLAYER NAME TO BEGIN ]</p>
+      <input id="player-name" class="input big" placeholder="YOUR NAME" maxlength="14" autocomplete="off" />
+      <div class="row">
+        <button class="btn" onclick="startGame()">▶ START QUEST</button>
+      </div>
+      <p class="small center" style="margin-top: 18px;">
+        Master multiplication, distribution, and fractions.<br/>
+        Defeat boss problems. Climb the leaderboard.
+      </p>
+    </div>
+
+    <div class="card">
+      <p class="small" style="letter-spacing: 2px; margin-bottom: 10px;">🏆 HALL OF FAME</p>
+      <div id="signup-leaderboard"></div>
+    </div>
+  </div>
+
+  <!-- MAIN GAME SCREEN -->
+  <div id="game-screen" class="hidden">
+    <div class="hud">
+      <div class="hud-left">
+        <div class="hud-avatar" id="hud-avatar">?</div>
+        <div>
+          <div class="hud-name" id="hud-name">PLAYER</div>
+          <div class="small" id="hud-level">LV 1 · NOVICE</div>
+        </div>
+      </div>
+      <div class="hud-stats">
+        <div class="stat">
+          <div class="stat-label">XP</div>
+          <div class="stat-value" id="hud-xp">0</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">BEST</div>
+          <div class="stat-value pink" id="hud-best">0</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">SOLVED</div>
+          <div class="stat-value cyan" id="hud-solved">0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODE SELECT -->
+    <div id="mode-select">
+      <p class="subtitle">Choose Your Challenge</p>
+      <div class="modes">
+        <div class="mode-card classic" onclick="startMode('classic')">
+          <div class="mode-icon">⚔️</div>
+          <div class="mode-title">CLASSIC</div>
+          <div class="mode-desc">10 questions, no timer. Build up your XP at your own pace.</div>
+        </div>
+        <div class="mode-card timed" onclick="startMode('timed')">
+          <div class="mode-icon">⚡</div>
+          <div class="mode-title">SPEED RUN</div>
+          <div class="mode-desc">60 seconds. Answer as many as you can. Bonus XP per second saved.</div>
+        </div>
+        <div class="mode-card error" onclick="startMode('error')">
+          <div class="mode-icon">🔍</div>
+          <div class="mode-title">SPOT THE BUG</div>
+          <div class="mode-desc">A worked solution has ONE mistake. Find which step is wrong.</div>
+        </div>
+        <div class="mode-card boss" onclick="startMode('boss')">
+          <div class="mode-icon">👹</div>
+          <div class="mode-title">BOSS FIGHT</div>
+          <div class="mode-desc">5 hard problems combining everything. 3 lives. Big XP reward.</div>
+        </div>
+      </div>
+      <div class="row">
+        <button class="btn ghost" onclick="showLeaderboard()">🏆 LEADERBOARD</button>
+        <button class="btn ghost" onclick="logout()">⤴ SIGN OUT</button>
+      </div>
+    </div>
+
+    <!-- QUESTION SCREEN -->
+    <div id="question-screen" class="hidden">
+      <div class="card glow">
+        <div id="timer-wrap" class="hidden">
+          <div class="timer-bar"><div class="timer-fill" id="timer-fill" style="width:100%"></div></div>
+        </div>
+        <div class="question-area">
+          <div class="q-meta" id="q-meta">QUESTION 1 OF 10</div>
+          <div class="q-text" id="q-text">3(x + 4) = ?</div>
+          <div class="q-hint" id="q-hint">Distribute the 3 across both terms</div>
+          <div id="answer-region">
+            <div class="answer-row" id="text-answer-row">
+              <input id="answer" class="input big" placeholder="?" autocomplete="off" />
+              <button class="btn yellow" onclick="submitAnswer()">GO</button>
+            </div>
+          </div>
+          <div id="feedback-area"></div>
+        </div>
+      </div>
+      <div class="row">
+        <button class="btn ghost" onclick="quitGame()">⏏ QUIT</button>
+      </div>
+    </div>
+
+    <!-- RESULTS SCREEN -->
+    <div id="results-screen" class="hidden">
+      <div class="card glow modal">
+        <p class="subtitle" id="result-title">QUEST COMPLETE</p>
+        <div class="big-score" id="result-score">+0</div>
+        <p id="result-summary" class="small" style="margin-bottom: 16px;">XP EARNED</p>
+        <div id="result-achievements"></div>
+        <div class="row">
+          <button class="btn" onclick="backToModes()">▶ PLAY AGAIN</button>
+          <button class="btn cyan" onclick="showLeaderboard()">🏆 RANKINGS</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- LEADERBOARD SCREEN -->
+    <div id="leaderboard-screen" class="hidden">
+      <div class="card glow">
+        <p class="subtitle">🏆 GLOBAL HALL OF FAME</p>
+        <div id="full-leaderboard"></div>
+        <div class="row">
+          <button class="btn ghost" onclick="backToModes()">⬅ BACK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* =========================================================
+   PROBLEM GENERATORS
+   Three sets, mapped to the original practice plan:
+   Set 1: Basic distribution    a(x ± b)
+   Set 2: Distribute & cancel with fractions
+   Set 3: Clear the denominator from an equation
+   ========================================================= */
+
+const rand = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
+const choice = arr => arr[Math.floor(Math.random() * arr.length)];
+
+/* SET 1 — Basic distribution: a(x ± b) or a(cx ± b) */
+function genSet1() {
+  const a = choice([-6, -5, -4, -3, -2, 2, 3, 4, 5, 6]);
+  const c = choice([1, 1, 1, 2, 3]); // coefficient on x (usually 1)
+  const b = rand(2, 9);
+  const sign = choice(['+', '-']);
+  const inner = c === 1
+    ? `x ${sign} ${b}`
+    : `${c}x ${sign} ${b}`;
+  const q = `${a}(${inner})`;
+  // compute answer
+  const term1 = a * c;
+  const term2 = sign === '+' ? a * b : -a * b;
+  const ans = formatLinear(term1, term2);
+  return {
+    question: q + ' = ?',
+    hint: `Multiply ${a} by each term inside`,
+    answer: ans,
+    accepted: acceptedFormsLinear(term1, term2),
+    explanation: `${a} × ${c === 1 ? 'x' : c + 'x'} = ${term1}${c === 1 ? 'x' : 'x'}, and ${a} × (${sign}${b}) = ${term2 >= 0 ? '+' : ''}${term2}`
+  };
+}
+
+/* SET 2 — Distribute & cancel with fractions: D · (ax/D + b) style */
+function genSet2() {
+  // pick a denominator D, a multiplier M, an inner like (cx/D + k) or two-fraction case
+  const variant = choice(['simple', 'simple', 'mixed', 'twofrac']);
+
+  if (variant === 'simple') {
+    // M · (cx/M + k)  where M cancels with denominator
+    const M = choice([6, 8, 10, 12]);
+    const c = choice([1, 2, 3]);
+    const k = rand(1, 9);
+    const sign = choice(['+', '-']);
+    // result = c*x  ±  M*k
+    const term1 = c;
+    const term2 = sign === '+' ? M * k : -M * k;
+    return {
+      question: `${M} · ( ${c}x/${M} ${sign} ${k} ) = ?`,
+      hint: `The ${M} cancels with the /${M} — don't multiply them!`,
+      answer: formatLinear(term1, term2),
+      accepted: acceptedFormsLinear(term1, term2),
+      explanation: `${M} × ${c}x/${M} = ${c}x (the ${M}s cancel). ${M} × ${sign}${k} = ${term2 >= 0 ? '+' : ''}${term2}.`
+    };
+  } else if (variant === 'mixed') {
+    // M · (x/d + k) where d divides M
+    const d = choice([2, 3, 4, 5]);
+    const mult = choice([2, 3]);
+    const M = d * mult;
+    const k = rand(1, 8);
+    const sign = choice(['+', '-']);
+    const term1 = mult;
+    const term2 = sign === '+' ? M * k : -M * k;
+    return {
+      question: `${M} · ( x/${d} ${sign} ${k} ) = ?`,
+      hint: `${M} ÷ ${d} = ${mult}, so the x term becomes ${mult}x`,
+      answer: formatLinear(term1, term2),
+      accepted: acceptedFormsLinear(term1, term2),
+      explanation: `${M} × x/${d} = ${mult}x. ${M} × ${sign}${k} = ${term2 >= 0 ? '+' : ''}${term2}.`
+    };
+  } else {
+    // M · (x/a ± x/b)
+    const M = choice([6, 12]);
+    const a = M === 6 ? choice([2, 3]) : choice([2, 3, 4, 6]);
+    let b = M === 6 ? choice([2, 3]) : choice([2, 3, 4, 6]);
+    while (b === a) b = M === 6 ? choice([2, 3]) : choice([2, 3, 4, 6]);
+    const sign = choice(['+', '-']);
+    const t1 = M / a;
+    const t2 = sign === '+' ? M / b : -M / b;
+    return {
+      question: `${M} · ( x/${a} ${sign} x/${b} ) = ?`,
+      hint: `Multiply ${M} into EACH fraction — they cancel separately`,
+      answer: formatLinear(t1 + t2, 0),
+      accepted: acceptedFormsLinear(t1 + t2, 0),
+      explanation: `${M}×x/${a} = ${t1}x.  ${M}×x/${b} = ${M / b}x.  ${t1}x ${sign} ${M / b}x = ${t1 + t2}x.`
+    };
+  }
+}
+
+/* SET 3 — Clear denominator from an equation */
+function genSet3() {
+  // x/d + k = R  →  multiply both sides by d
+  const d = choice([2, 3, 4, 5, 6]);
+  const cInner = choice([1, 1, 2, 3]);
+  const k = rand(1, 9);
+  const sign = choice(['+', '-']);
+  const xVal = rand(2, 12);
+  // form:  cInner*x/d  (sign) k  = R
+  const lhsAtX = (cInner * xVal) / d + (sign === '+' ? k : -k);
+  // ensure clean integer R
+  if (!Number.isInteger(lhsAtX)) {
+    return genSet3();
+  }
+  const R = lhsAtX;
+  const ansX = xVal;
+  const xTerm = cInner === 1 ? `x/${d}` : `${cInner}x/${d}`;
+  return {
+    question: `${xTerm} ${sign} ${k} = ${R}     find x`,
+    hint: `Multiply BOTH sides by ${d} first to clear the fraction`,
+    answer: `x=${ansX}`,
+    accepted: [`x=${ansX}`, `${ansX}`, `x = ${ansX}`],
+    explanation: `Multiply both sides by ${d}: ${cInner === 1 ? '' : cInner}x ${sign} ${d * k} = ${d * R}. Then solve → x = ${ansX}.`
+  };
+}
+
+/* BOSS — Mix from all three sets, harder */
+function genBoss() {
+  const r = Math.random();
+  if (r < 0.3) {
+    // harder distribution with negative coefficient
+    const a = choice([-12, -10, -8, 8, 10, 12]);
+    const c = choice([2, 3, 4]);
+    const b = rand(3, 12);
+    const sign = choice(['+', '-']);
+    const t1 = a * c;
+    const t2 = sign === '+' ? a * b : -a * b;
+    return {
+      question: `${a}(${c}x ${sign} ${b}) = ?`,
+      hint: `Watch the sign on ${a}!`,
+      answer: formatLinear(t1, t2),
+      accepted: acceptedFormsLinear(t1, t2),
+      explanation: `${a}×${c}x = ${t1}x.  ${a}×${sign}${b} = ${t2 >= 0 ? '+' : ''}${t2}.`
+    };
+  } else if (r < 0.65) {
+    return genSet2();
+  } else {
+    return genSet3();
+  }
+}
+
+/* SPOT THE BUG — generate a worked solution with one mistake */
+function genErrorProblem() {
+  const flavor = choice(['dist', 'fracMult', 'fracEq']);
+
+  if (flavor === 'dist') {
+    const a = choice([3, 4, 5, 6, -3, -4, -5]);
+    const b = rand(2, 9);
+    const sign = choice(['+', '-']);
+    const correctT2 = sign === '+' ? a * b : -a * b;
+    const wrongT2 = sign === '+' ? Math.abs(a) * b : Math.abs(a) * b; // sign error
+    const useWrong = Math.random() < 0.6;
+    const steps = [
+      { text: `Solve:  ${a}(x ${sign} ${b})` },
+      { text: `Step 1:  ${a} · x  ${useWrong ? '+' : (a < 0 ? '−' : '+')}  ${a} · ${sign}${b}`, wrong: false },
+      { text: `Step 2:  ${a}x ${sign === '+' ? '+' : '−'} ${Math.abs(a * b)}`, wrong: false },
+      { text: `Step 3:  ${useWrong ? (a + 'x + ' + Math.abs(a * b)) : (a + 'x ' + (correctT2 >= 0 ? '+ ' + correctT2 : '− ' + Math.abs(correctT2)))}`, wrong: useWrong }
+    ];
+    // If we forced a wrong step, mark which step is the error step
+    // Simpler approach: always make a definite error in one step
+    return makeErrorScenarioDist(a, b, sign);
+  }
+
+  if (flavor === 'fracMult') {
+    return makeErrorScenarioFracMult();
+  }
+  return makeErrorScenarioFracEq();
+}
+
+function makeErrorScenarioDist(a, b, sign) {
+  const correctT2 = sign === '+' ? a * b : -a * b;
+  // possible errors:
+  // E1: forgot to distribute to second term → result = a·x ± b (no multiplication)
+  // E2: sign flip on second term
+  // E3: distributed to x but wrote ax + b (forgot multiply 2nd)
+  const errorType = choice(['noDistribute', 'signFlip']);
+  const correctFinal = `${a}x ${correctT2 >= 0 ? '+ ' + correctT2 : '− ' + Math.abs(correctT2)}`;
+  let badFinal;
+  if (errorType === 'noDistribute') {
+    badFinal = `${a}x ${sign} ${b}`;
+  } else {
+    badFinal = `${a}x ${correctT2 < 0 ? '+ ' + Math.abs(correctT2) : '− ' + correctT2}`;
+  }
+  const steps = [
+    { text: `Problem:  ${a}(x ${sign} ${b})`, wrong: false },
+    { text: `Step 1:  Distribute ${a} to each term`, wrong: false },
+    { text: `Step 2:  ${a} · x ${sign === '+' ? '+' : '−'} ${a} · ${b}`,
+      wrong: errorType === 'noDistribute' ? false : false }, // not the wrong step
+    { text: `Step 3:  ${badFinal}`, wrong: true }
+  ];
+  return {
+    intro: `Find the WRONG step:`,
+    steps,
+    answerIndex: 3,
+    explanation: errorType === 'noDistribute'
+      ? `Step 3 forgot to multiply ${a} by ${b}. Correct: ${correctFinal}`
+      : `Step 3 has a sign error. ${a} × ${sign}${b} = ${correctT2 >= 0 ? '+' : ''}${correctT2}. Correct: ${correctFinal}`
+  };
+}
+
+function makeErrorScenarioFracMult() {
+  // Multiply M · (cx/M + k) — classic error: writes M·c instead of c
+  const M = choice([10, 12, 8]);
+  const c = choice([2, 3]);
+  const k = rand(2, 8);
+  const sign = choice(['+', '-']);
+  const correctT1 = c;
+  const wrongT1 = M * c; // the classic mistake
+  const correctT2 = sign === '+' ? M * k : -M * k;
+  const useFracError = Math.random() < 0.7;
+  let badStep, badFinal, correctFinal, explanation;
+  if (useFracError) {
+    badFinal = `${wrongT1}x ${sign} ${correctT2 >= 0 ? correctT2 : '− ' + Math.abs(correctT2)}`.replace('+ -', '− ');
+    correctFinal = `${correctT1}x ${correctT2 >= 0 ? '+ ' + correctT2 : '− ' + Math.abs(correctT2)}`;
+    explanation = `Step 3 made the classic mistake: ${M} × ${c}x/${M}  should CANCEL to ${c}x, not become ${wrongT1}x. The ${M}s cancel out!`;
+  } else {
+    badFinal = `${correctT1}x ${sign} ${k}`; // forgot to multiply k
+    correctFinal = `${correctT1}x ${correctT2 >= 0 ? '+ ' + correctT2 : '− ' + Math.abs(correctT2)}`;
+    explanation = `Step 3 forgot to multiply ${k} by ${M}. Both terms must be multiplied, not just one.`;
+  }
+  return {
+    intro: `Find the WRONG step:`,
+    steps: [
+      { text: `Problem:  ${M} · ( ${c}x/${M} ${sign} ${k} )`, wrong: false },
+      { text: `Step 1:  Distribute ${M} to each term inside`, wrong: false },
+      { text: `Step 2:  ${M} · ${c}x/${M}  ${sign === '+' ? '+' : '−'}  ${M} · ${k}`, wrong: false },
+      { text: `Step 3:  ${badFinal}`, wrong: true }
+    ],
+    answerIndex: 3,
+    explanation
+  };
+}
+
+function makeErrorScenarioFracEq() {
+  // x/d + k = R, then they multiply by d but only multiply some terms
+  const d = choice([3, 4, 5, 6]);
+  const xVal = rand(2, 10);
+  const k = rand(1, 6);
+  const sign = choice(['+', '-']);
+  const lhs = xVal / d + (sign === '+' ? k : -k);
+  if (!Number.isInteger(lhs)) return makeErrorScenarioFracEq();
+  const R = lhs;
+  // common error: multiply ONLY the fraction term, not the whole side
+  const badStep2 = `x ${sign} ${k} = ${R}`; // forgot to multiply k and R by d
+  return {
+    intro: `Find the WRONG step:`,
+    steps: [
+      { text: `Problem:  x/${d} ${sign} ${k} = ${R}    find x`, wrong: false },
+      { text: `Step 1:  Multiply BOTH sides by ${d}`, wrong: false },
+      { text: `Step 2:  ${badStep2}`, wrong: true },
+      { text: `Step 3:  Solve for x`, wrong: false }
+    ],
+    answerIndex: 2,
+    explanation: `Step 2 only multiplied the x/${d} term. When you multiply by ${d}, EVERY term on both sides gets multiplied: x ${sign} ${d * k} = ${d * R}.`
+  };
+}
+
+/* ---------- helpers for formatting linear answers ---------- */
+function formatLinear(coef, constant) {
+  let s = '';
+  if (coef === 0) s = '0';
+  else if (coef === 1) s = 'x';
+  else if (coef === -1) s = '-x';
+  else s = coef + 'x';
+  if (constant === 0) return s;
+  if (s === '0') return String(constant);
+  if (constant > 0) return s + '+' + constant;
+  return s + constant; // negative already has sign
+}
+
+/* Generate many acceptable string forms */
+function acceptedFormsLinear(coef, constant) {
+  const base = formatLinear(coef, constant);
+  const variants = new Set();
+  const c = coef, k = constant;
+
+  function push(str) { variants.add(normalize(str)); }
+
+  // canonical
+  push(base);
+  // with spaces around operator
+  if (k !== 0) {
+    if (c !== 0) {
+      const coefPart = c === 1 ? 'x' : c === -1 ? '-x' : c + 'x';
+      const kAbs = Math.abs(k);
+      const op = k > 0 ? '+' : '-';
+      push(`${coefPart} ${op} ${kAbs}`);
+      push(`${coefPart}${op}${kAbs}`);
+      // reverse order
+      push(`${k > 0 ? k : k} ${c >= 0 ? '+' : ''}${coefPart}`); // e.g. 12+3x
+      if (k > 0) push(`${k}+${coefPart}`);
+      else push(`${kAbs} ${coefPart.startsWith('-') ? coefPart : '-' + coefPart}`);
+    } else {
+      push(String(k));
+    }
+  } else {
+    // only x term
+    if (c === 1) push('x');
+    else if (c === -1) push('-x');
+    else push(c + 'x');
+  }
+  return Array.from(variants);
+}
+
+function normalize(s) {
+  return String(s).toLowerCase().replace(/\s+/g, '').replace(/−/g, '-').replace(/\*/g, '');
+}
+
+/* =========================================================
+   GAME STATE & STORAGE
+   ========================================================= */
+
+const STORAGE_PLAYER_PREFIX = 'mq:player:';
+const STORAGE_LB_KEY = 'mq:leaderboard';
+
+const state = {
+  player: null, // { name, xp, best, solved, achievements: [] }
+  mode: null,   // 'classic' | 'timed' | 'error' | 'boss'
+  questions: [],
+  currentIdx: 0,
+  score: 0,
+  correctCount: 0,
+  startTime: 0,
+  timer: null,
+  timeLeft: 0,
+  lives: 3,
+  streak: 0,
+  bestStreak: 0
+};
+
+async function loadPlayer(name) {
+  try {
+    const v = localStorage.getItem(STORAGE_PLAYER_PREFIX + name);
+    if (v) return JSON.parse(v);
+  } catch (e) { /* not found */ }
+  return null;
+}
+
+async function savePlayer() {
+  try {
+    localStorage.setItem(STORAGE_PLAYER_PREFIX + state.player.name, JSON.stringify(state.player));
+  } catch (e) { console.error(e); }
+}
+
+async function loadLeaderboard() {
+  try {
+    const v = localStorage.getItem(STORAGE_LB_KEY);
+    if (v) return JSON.parse(v);
+  } catch (e) { /* empty */ }
+  return [];
+}
+
+async function updateLeaderboard() {
+  try {
+    let lb = await loadLeaderboard();
+    const existing = lb.findIndex(e => e.name === state.player.name);
+    const entry = { name: state.player.name, xp: state.player.xp, best: state.player.best };
+    if (existing >= 0) lb[existing] = entry;
+    else lb.push(entry);
+    lb.sort((a, b) => b.xp - a.xp);
+    lb = lb.slice(0, 20);
+    localStorage.setItem(STORAGE_LB_KEY, JSON.stringify(lb));
+  } catch (e) { console.error(e); }
+}
+
+/* =========================================================
+   SCREEN FLOW
+   ========================================================= */
+
+async function startGame() {
+  const nameRaw = document.getElementById('player-name').value.trim();
+  if (!nameRaw) {
+    document.getElementById('player-name').style.borderColor = 'var(--danger)';
+    return;
+  }
+  const name = nameRaw.toUpperCase().slice(0, 14);
+  let p = await loadPlayer(name);
+  if (!p) {
+    p = { name, xp: 0, best: 0, solved: 0, achievements: [] };
+  }
+  state.player = p;
+  await savePlayer();
+  document.getElementById('signup-screen').classList.add('hidden');
+  document.getElementById('game-screen').classList.remove('hidden');
+  updateHUD();
+  showModeSelect();
+}
+
+function logout() {
+  state.player = null;
+  document.getElementById('game-screen').classList.add('hidden');
+  document.getElementById('signup-screen').classList.remove('hidden');
+  document.getElementById('player-name').value = '';
+  renderSignupLeaderboard();
+}
+
+function updateHUD() {
+  const p = state.player;
+  document.getElementById('hud-name').textContent = p.name;
+  document.getElementById('hud-avatar').textContent = p.name[0];
+  document.getElementById('hud-xp').textContent = p.xp;
+  document.getElementById('hud-best').textContent = p.best;
+  document.getElementById('hud-solved').textContent = p.solved;
+  document.getElementById('hud-level').textContent = `LV ${level(p.xp)} · ${rankName(p.xp)}`;
+}
+
+function level(xp) { return 1 + Math.floor(xp / 100); }
+function rankName(xp) {
+  if (xp < 100) return 'NOVICE';
+  if (xp < 300) return 'APPRENTICE';
+  if (xp < 600) return 'ADEPT';
+  if (xp < 1000) return 'EXPERT';
+  if (xp < 1500) return 'MASTER';
+  if (xp < 2500) return 'GRANDMASTER';
+  return 'LEGEND';
+}
+
+function showModeSelect() {
+  hideAllScreens();
+  document.getElementById('mode-select').classList.remove('hidden');
+}
+function hideAllScreens() {
+  ['mode-select', 'question-screen', 'results-screen', 'leaderboard-screen']
+    .forEach(id => document.getElementById(id).classList.add('hidden'));
+}
+
+function startMode(mode) {
+  state.mode = mode;
+  state.currentIdx = 0;
+  state.score = 0;
+  state.correctCount = 0;
+  state.streak = 0;
+  state.bestStreak = 0;
+  state.startTime = Date.now();
+  state.lives = mode === 'boss' ? 3 : Infinity;
+
+  if (mode === 'classic') {
+    state.questions = buildQuestions(10);
+  } else if (mode === 'boss') {
+    state.questions = Array.from({ length: 5 }, () => genBoss());
+  } else if (mode === 'error') {
+    state.questions = Array.from({ length: 6 }, () => genErrorProblem());
+  } else if (mode === 'timed') {
+    state.questions = null; // infinite generation
+    state.timeLeft = 60;
+    startTimer();
+  }
+  hideAllScreens();
+  document.getElementById('question-screen').classList.remove('hidden');
+  showQuestion();
+}
+
+function buildQuestions(n) {
+  // mix from all 3 sets evenly
+  const arr = [];
+  const generators = [genSet1, genSet2, genSet3];
+  for (let i = 0; i < n; i++) {
+    arr.push(generators[i % 3]());
+  }
+  // shuffle
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function startTimer() {
+  document.getElementById('timer-wrap').classList.remove('hidden');
+  const total = 60;
+  state.timer = setInterval(() => {
+    state.timeLeft -= 0.1;
+    const pct = Math.max(0, (state.timeLeft / total) * 100);
+    document.getElementById('timer-fill').style.width = pct + '%';
+    if (state.timeLeft <= 0) {
+      clearInterval(state.timer);
+      state.timer = null;
+      finishGame();
+    }
+  }, 100);
+}
+
+function stopTimer() {
+  if (state.timer) { clearInterval(state.timer); state.timer = null; }
+  document.getElementById('timer-wrap').classList.add('hidden');
+}
+
+function showQuestion() {
+  const q = state.mode === 'timed' ? pickTimedQuestion() : state.questions[state.currentIdx];
+  state.currentQ = q;
+  document.getElementById('feedback-area').innerHTML = '';
+  if (state.mode === 'error') {
+    renderErrorQuestion(q);
+  } else {
+    renderTextQuestion(q);
+  }
+}
+
+function pickTimedQuestion() {
+  // generate fresh; mix all sets
+  const r = Math.random();
+  if (r < 0.34) return genSet1();
+  if (r < 0.67) return genSet2();
+  return genSet3();
+}
+
+function renderTextQuestion(q) {
+  let meta = '';
+  if (state.mode === 'classic') meta = `QUEST ${state.currentIdx + 1} / 10`;
+  else if (state.mode === 'boss') meta = `BOSS ${state.currentIdx + 1} / 5  ·  ❤️ ${state.lives}`;
+  else if (state.mode === 'timed') meta = `STREAK: ${state.streak}${state.streak >= 3 ? ' 🔥' : ''}  ·  SOLVED: ${state.correctCount}`;
+  document.getElementById('q-meta').textContent = meta;
+  document.getElementById('q-text').textContent = q.question;
+  document.getElementById('q-hint').textContent = q.hint || '';
+  document.getElementById('answer-region').innerHTML = `
+    <div class="answer-row">
+      <input id="answer" class="input big" placeholder="?" autocomplete="off" />
+      <button class="btn yellow" onclick="submitAnswer()">GO</button>
+    </div>`;
+  const inp = document.getElementById('answer');
+  inp.focus();
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') submitAnswer(); });
+}
+
+function renderErrorQuestion(q) {
+  document.getElementById('q-meta').textContent = `BUG HUNT ${state.currentIdx + 1} / 6`;
+  document.getElementById('q-text').textContent = q.intro;
+  document.getElementById('q-hint').textContent = 'Tap the step that contains the mistake';
+  const html = `<div class="error-steps">${
+    q.steps.map((s, i) => `<div class="step" data-idx="${i}" onclick="selectErrorStep(${i})"><span class="step-num">${i === 0 ? '•' : i + '.'}</span>${escapeHTML(s.text)}</div>`).join('')
+  }</div>`;
+  document.getElementById('answer-region').innerHTML = html;
+}
+
+function escapeHTML(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function selectErrorStep(idx) {
+  const q = state.currentQ;
+  const steps = document.querySelectorAll('.step');
+  steps.forEach(s => s.classList.remove('selected'));
+  steps[idx].classList.add('selected');
+  const correct = (idx === q.answerIndex);
+  // brief delay then reveal
+  setTimeout(() => {
+    steps.forEach(s => { s.style.pointerEvents = 'none'; });
+    steps[q.answerIndex].classList.add('correct');
+    if (!correct) steps[idx].classList.add('wrong');
+    handleResult(correct, q.explanation);
+  }, 250);
+}
+
+function submitAnswer() {
+  const q = state.currentQ;
+  const inp = document.getElementById('answer');
+  if (!inp) return;
+  const userAns = normalize(inp.value);
+  if (!userAns) return;
+  const correct = q.accepted.some(a => normalize(a) === userAns);
+  handleResult(correct, q.explanation, q.answer);
+}
+
+function handleResult(correct, explanation, correctAnswer) {
+  const fb = document.getElementById('feedback-area');
+  if (correct) {
+    state.correctCount++;
+    state.streak++;
+    if (state.streak > state.bestStreak) state.bestStreak = state.streak;
+    let pts = 10;
+    if (state.mode === 'boss') pts = 30;
+    if (state.mode === 'error') pts = 15;
+    if (state.mode === 'timed') pts = 10 + Math.min(state.streak, 10);
+    if (state.streak >= 3) pts += 5;
+    if (state.streak >= 5) pts += 10;
+    state.score += pts;
+    floatPoints('+' + pts);
+    fb.innerHTML = `<div class="feedback good">✓ CORRECT  +${pts} XP${state.streak >= 3 ? ' <span class="streak">🔥' + state.streak + '</span>' : ''}</div>`;
+  } else {
+    state.streak = 0;
+    if (state.mode === 'boss') {
+      state.lives--;
+    }
+    const detail = explanation
+      ? `<div class="feedback-detail">${escapeHTML(explanation)}${correctAnswer ? `<br/>Answer: <span class="eq">${escapeHTML(correctAnswer)}</span>` : ''}</div>`
+      : '';
+    fb.innerHTML = `<div class="feedback bad">✗ WRONG${detail}</div>`;
+  }
+
+  // advance
+  setTimeout(() => {
+    if (state.mode === 'boss' && state.lives <= 0) {
+      finishGame();
+      return;
+    }
+    if (state.mode === 'timed') {
+      state.currentIdx++;
+      showQuestion();
+      return;
+    }
+    state.currentIdx++;
+    if (state.currentIdx >= state.questions.length) {
+      finishGame();
+    } else {
+      showQuestion();
+    }
+  }, correct ? 900 : 2400);
+}
+
+function floatPoints(text) {
+  const el = document.createElement('div');
+  el.className = 'float-points';
+  el.textContent = text;
+  el.style.left = (window.innerWidth / 2 - 30) + 'px';
+  el.style.top = (window.innerHeight / 2 - 100) + 'px';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1000);
+}
+
+async function finishGame() {
+  stopTimer();
+  // update player stats
+  const p = state.player;
+  p.xp += state.score;
+  p.solved += state.correctCount;
+  if (state.score > p.best) p.best = state.score;
+  // achievements
+  const newAchievements = [];
+  function add(a) {
+    if (!p.achievements.includes(a)) { p.achievements.push(a); newAchievements.push(a); }
+  }
+  if (state.correctCount >= 5) add('5_in_a_row_session');
+  if (state.bestStreak >= 5) add('streak_5');
+  if (state.bestStreak >= 10) add('streak_10');
+  if (state.mode === 'boss' && state.lives > 0 && state.correctCount === 5) add('boss_slayer');
+  if (state.mode === 'timed' && state.correctCount >= 10) add('speed_demon');
+  if (p.xp >= 100 && level(p.xp) >= 2) add('level_2');
+  if (p.xp >= 500) add('level_6');
+
+  await savePlayer();
+  await updateLeaderboard();
+  updateHUD();
+
+  // render results
+  hideAllScreens();
+  document.getElementById('results-screen').classList.remove('hidden');
+
+  let title = 'QUEST COMPLETE';
+  if (state.mode === 'boss') {
+    title = state.lives > 0 ? '👑 BOSS DEFEATED' : '💀 DEFEATED';
+  } else if (state.mode === 'timed') {
+    title = '⏱ TIME UP';
+  } else if (state.mode === 'error') {
+    title = '🔍 HUNT COMPLETE';
+  }
+  document.getElementById('result-title').textContent = title;
+  document.getElementById('result-score').textContent = '+' + state.score;
+  document.getElementById('result-summary').innerHTML =
+    `XP EARNED  ·  ${state.correctCount} CORRECT  ·  BEST STREAK ${state.bestStreak}`;
+
+  const achHTML = newAchievements.length
+    ? `<div style="margin: 14px 0;"><div class="small" style="margin-bottom: 8px;">🎖️ NEW ACHIEVEMENTS</div>${
+      newAchievements.map(a => `<span class="achievement">${achievementLabel(a)}</span>`).join('')
+    }</div>`
+    : '';
+  document.getElementById('result-achievements').innerHTML = achHTML;
+}
+
+function achievementLabel(a) {
+  return ({
+    '5_in_a_row_session': 'GETTING WARM',
+    'streak_5': '🔥 STREAK x5',
+    'streak_10': '🔥🔥 STREAK x10',
+    'boss_slayer': '👑 BOSS SLAYER',
+    'speed_demon': '⚡ SPEED DEMON',
+    'level_2': 'LEVEL UP',
+    'level_6': 'EXPERT TIER'
+  })[a] || a;
+}
+
+function backToModes() { showModeSelect(); }
+function quitGame() {
+  stopTimer();
+  showModeSelect();
+}
+
+async function showLeaderboard() {
+  hideAllScreens();
+  document.getElementById('leaderboard-screen').classList.remove('hidden');
+  const lb = await loadLeaderboard();
+  const html = lb.length
+    ? lb.map((e, i) => `<div class="lb-row ${e.name === state.player.name ? 'me' : ''}">
+        <span class="lb-rank">${i + 1}.</span>
+        <span class="lb-name">${escapeHTML(e.name)}</span>
+        <span class="lb-score">${e.xp} XP</span>
+      </div>`).join('')
+    : '<div class="small center" style="padding: 20px;">No champions yet. Be the first.</div>';
+  document.getElementById('full-leaderboard').innerHTML = html;
+}
+
+async function renderSignupLeaderboard() {
+  const lb = await loadLeaderboard();
+  const top = lb.slice(0, 5);
+  const html = top.length
+    ? top.map((e, i) => `<div class="lb-row">
+        <span class="lb-rank">${i + 1}.</span>
+        <span class="lb-name">${escapeHTML(e.name)}</span>
+        <span class="lb-score">${e.xp} XP</span>
+      </div>`).join('')
+    : '<div class="small">Empty. First player gets the top spot.</div>';
+  document.getElementById('signup-leaderboard').innerHTML = html;
+}
+
+// init
+document.addEventListener('DOMContentLoaded', () => {
+  renderSignupLeaderboard();
+  document.getElementById('player-name').addEventListener('keydown', e => {
+    if (e.key === 'Enter') startGame();
+  });
+});
+</script>
+</body>
+</html>
