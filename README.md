@@ -2,7 +2,7 @@
 
 A single-file HTML math practice game. Multiplication, distribution, and fractions, dressed up as a retro arcade.
 
-**Play it:** https://manugarg.github.io/math-quest/
+**Play it:** https://mathquest.manugarg.com
 
 ## Run locally
 
