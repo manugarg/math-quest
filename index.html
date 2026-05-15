@@ -702,7 +702,87 @@ function genSet3() {
   };
 }
 
-/* BOSS — Mix from all three sets, harder */
+/* SET 4 — Distribute & combine like terms.
+   Covers patterns like:
+     a(bx±c) ± k          (distribute, then collect constants)
+     a(bx±c) ± dx         (distribute, then collect x terms)
+     dx ± a(bx±c) ± k     (lead with x, distribute middle, then collect)
+     a(bx±c) ± d(ex±f)    (two distributions, then collect)
+     a(bx±c) ± (dx±e)     (the d=1 case becomes a bare "-(2x-5)" parens) */
+function genSet4() {
+  const t = difficultyTier();
+
+  function dist(allowOne) {
+    return {
+      type: 'dist',
+      a: allowOne
+        ? choice(t === 0 ? [1, 2, 3, 4] : [1, 2, 3, 4, 5, 6])
+        : rand(2, 6 + 2 * t),
+      b: choice(t === 0 ? [1, 2, 3] : [2, 3, 4, 5]),
+      c: rand(1, 8 + 2 * t),
+      cSign: choice([1, -1])
+    };
+  }
+  const plainX = () => ({ type: 'x', d: rand(2, 7 + 2 * t) });
+  const constT = () => ({ type: 'c', k: rand(1, 9 + 2 * t) });
+
+  const recipes = [
+    { gens: [() => dist(false), constT],                  hint: 'Distribute first, then combine the constants' },
+    { gens: [() => dist(false), plainX],                  hint: 'Distribute first, then combine the x terms' },
+    { gens: [plainX, () => dist(false), constT],          hint: 'Distribute the middle piece, then combine like terms' },
+    { gens: [() => dist(false), () => dist(true)],        hint: 'Distribute BOTH parentheses, then combine like terms' }
+  ];
+  const recipe = choice(recipes);
+  const pieces = recipe.gens.map(g => ({ sign: choice([1, -1]), piece: g() }));
+
+  let xCoef = 0, constant = 0;
+  const parts = [];
+  const distSteps = [];
+
+  pieces.forEach((p, i) => {
+    const piece = p.piece;
+    let str = '';
+    if (piece.type === 'dist') {
+      const aSigned = p.sign * piece.a;
+      const innerC = piece.cSign * piece.c;
+      const xT = aSigned * piece.b;
+      const cT = aSigned * innerC;
+      xCoef += xT;
+      constant += cT;
+      const innerStr = `${piece.b === 1 ? '' : piece.b}x ${piece.cSign > 0 ? '+' : '-'} ${piece.c}`;
+      if (i === 0) {
+        str = piece.a === 1
+          ? `${p.sign > 0 ? '' : '-'}(${innerStr})`
+          : `${aSigned}(${innerStr})`;
+      } else {
+        const sep = p.sign > 0 ? '+ ' : '- ';
+        str = piece.a === 1 ? `${sep}(${innerStr})` : `${sep}${piece.a}(${innerStr})`;
+      }
+      distSteps.push(`${aSigned}(${innerStr}) = ${xT}x ${cT >= 0 ? '+ ' + cT : '- ' + Math.abs(cT)}`);
+    } else if (piece.type === 'x') {
+      xCoef += p.sign * piece.d;
+      str = i === 0
+        ? `${p.sign > 0 ? '' : '-'}${piece.d}x`
+        : `${p.sign > 0 ? '+ ' : '- '}${piece.d}x`;
+    } else {
+      constant += p.sign * piece.k;
+      str = i === 0
+        ? `${p.sign > 0 ? '' : '-'}${piece.k}`
+        : `${p.sign > 0 ? '+ ' : '- '}${piece.k}`;
+    }
+    parts.push(str);
+  });
+
+  return {
+    question: parts.join(' ') + ' = ?',
+    hint: recipe.hint,
+    answer: formatLinear(xCoef, constant),
+    accepted: acceptedFormsLinear(xCoef, constant),
+    explanation: `${distSteps.join('. ')}. Combine like terms → ${formatLinear(xCoef, constant)}.`
+  };
+}
+
+/* BOSS — Mix from all four sets, harder */
 function genBoss() {
   const t = difficultyTier();
   const r = Math.random();
@@ -721,10 +801,12 @@ function genBoss() {
       accepted: acceptedFormsLinear(t1, t2),
       explanation: `${a}×${c}x = ${t1}x.  ${a}×${sign}${b} = ${t2 >= 0 ? '+' : ''}${t2}.`
     };
-  } else if (r < 0.65) {
+  } else if (r < 0.55) {
     return genSet2();
-  } else {
+  } else if (r < 0.8) {
     return genSet3();
+  } else {
+    return genSet4();
   }
 }
 
@@ -874,11 +956,8 @@ function acceptedFormsLinear(coef, constant) {
       const kAbs = Math.abs(k);
       const op = k > 0 ? '+' : '-';
       push(`${coefPart} ${op} ${kAbs}`);
-      push(`${coefPart}${op}${kAbs}`);
-      // reverse order
-      push(`${k > 0 ? k : k} ${c >= 0 ? '+' : ''}${coefPart}`); // e.g. 12+3x
-      if (k > 0) push(`${k}+${coefPart}`);
-      else push(`${kAbs} ${coefPart.startsWith('-') ? coefPart : '-' + coefPart}`);
+      // constant-first reversal (k carries its own sign; coefPart carries its own sign for negative)
+      push(`${k} ${c > 0 ? '+' : ''}${coefPart}`);
     } else {
       push(String(k));
     }
@@ -1212,11 +1291,11 @@ function startMode(mode) {
 }
 
 function buildQuestions(n) {
-  // mix from all 3 sets evenly
+  // mix from all 4 sets evenly
   const arr = [];
-  const generators = [genSet1, genSet2, genSet3];
+  const generators = [genSet1, genSet2, genSet3, genSet4];
   for (let i = 0; i < n; i++) {
-    arr.push(generators[i % 3]());
+    arr.push(generators[i % generators.length]());
   }
   // shuffle
   for (let i = arr.length - 1; i > 0; i--) {
@@ -1260,9 +1339,10 @@ function showQuestion() {
 function pickTimedQuestion() {
   // generate fresh; mix all sets
   const r = Math.random();
-  if (r < 0.34) return genSet1();
-  if (r < 0.67) return genSet2();
-  return genSet3();
+  if (r < 0.25) return genSet1();
+  if (r < 0.5)  return genSet2();
+  if (r < 0.75) return genSet3();
+  return genSet4();
 }
 
 function renderTextQuestion(q) {
