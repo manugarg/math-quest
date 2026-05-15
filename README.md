@@ -15,8 +15,8 @@ xdg-open index.html   # Linux
 
 …or just double-click `index.html`.
 
-## Storage
+## Auth & storage
 
-Player profiles live in `localStorage` (per-browser/per-device), keyed `mq:player:<NAME>`.
+Sign-in is via Firebase Authentication — Google popup or passwordless email link. The browser caches the session, so users stay signed in until they hit "Sign Out".
 
-The leaderboard is shared globally via Firebase Firestore (project `fun-tools-mg`, collection `leaderboard`, doc id = URL-encoded player name). A copy of the most recent fetch is cached in `localStorage` under `mq:leaderboard` so the Hall of Fame still renders when offline.
+Player profiles and the global leaderboard share a single Firestore collection (project `fun-tools-mg`, collection `leaderboard`, doc id = Firebase Auth UID). The most recent leaderboard fetch is cached in `localStorage` under `mq:leaderboard` so the Hall of Fame still renders when offline.

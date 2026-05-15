@@ -400,16 +400,44 @@
     <h1 class="title">DISTRIBUTE</h1>
     <p class="subtitle">A Math Quest <span class="blink">▮</span></p>
 
-    <div class="card glow">
-      <p class="small center" style="margin-bottom: 18px; letter-spacing: 2px;">[ ENTER PLAYER NAME TO BEGIN ]</p>
-      <input id="player-name" class="input big" placeholder="YOUR NAME" maxlength="14" autocomplete="off" />
-      <div class="row">
-        <button class="btn" onclick="startGame()">▶ START QUEST</button>
+    <!-- Sign-in options -->
+    <div id="signin-options" class="card glow">
+      <p class="small center" style="margin-bottom: 18px; letter-spacing: 2px;">[ SIGN IN TO PLAY ]</p>
+      <div class="row" style="flex-direction: column; gap: 14px;">
+        <button class="btn cyan" onclick="signInWithGoogle()" style="width: 100%;">▶ CONTINUE WITH GOOGLE</button>
+        <div class="small center" style="letter-spacing: 3px; opacity: 0.6;">─── OR ───</div>
+        <input id="email-input" class="input" placeholder="your-email@example.com" autocomplete="email" type="email" />
+        <button class="btn" onclick="sendEmailLink()" style="width: 100%;">SEND SIGN-IN LINK</button>
       </div>
       <p class="small center" style="margin-top: 18px;">
         Master multiplication, distribution, and fractions.<br/>
         Defeat boss problems. Climb the leaderboard.
       </p>
+    </div>
+
+    <!-- Email-link sent state -->
+    <div id="email-sent-state" class="card glow hidden">
+      <p class="subtitle">📧 Check Your Email</p>
+      <p class="small center" style="margin: 18px 0;">
+        We sent a sign-in link to<br/>
+        <span style="color: var(--neon-3); font-family: 'VT323', monospace; font-size: 22px;" id="email-sent-address"></span>
+      </p>
+      <p class="small center" style="margin: 18px 0;">
+        Click the link on this device to finish signing in.
+      </p>
+      <div class="row">
+        <button class="btn ghost" onclick="cancelEmailSent()">⬅ BACK</button>
+      </div>
+    </div>
+
+    <!-- Pick game name (first sign-in) -->
+    <div id="name-entry-state" class="card glow hidden">
+      <p class="subtitle">Pick Your Game Name</p>
+      <p class="small center" style="margin-bottom: 14px;">This is what shows up on the leaderboard.</p>
+      <input id="display-name-input" class="input big" placeholder="YOUR NAME" maxlength="14" autocomplete="off" />
+      <div class="row">
+        <button class="btn" onclick="confirmDisplayName()">▶ ENTER QUEST</button>
+      </div>
     </div>
 
     <div class="card">
@@ -471,7 +499,7 @@
       </div>
       <div class="row">
         <button class="btn ghost" onclick="showLeaderboard()">🏆 LEADERBOARD</button>
-        <button class="btn ghost" onclick="logout()">⤴ SIGN OUT</button>
+        <button class="btn ghost" onclick="signOutNow()">⤴ SIGN OUT</button>
       </div>
     </div>
 
@@ -527,7 +555,14 @@
 
 </div>
 
-<script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+import {
+  getAuth, GoogleAuthProvider, signInWithPopup,
+  sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink,
+  onAuthStateChanged, signOut
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+
 /* =========================================================
    PROBLEM GENERATORS
    Three sets, mapped to the original practice plan:
@@ -840,12 +875,29 @@ function normalize(s) {
    GAME STATE & STORAGE
    ========================================================= */
 
-const STORAGE_PLAYER_PREFIX = 'mq:player:';
 const STORAGE_LB_KEY = 'mq:leaderboard'; // local cache of remote leaderboard
+const STORAGE_EMAIL_KEY = 'mq:email-for-signin';
 
-const FIREBASE_PROJECT_ID = 'fun-tools-mg';
-const FIREBASE_API_KEY = 'AIzaSyDofCu66n4Byq1p9bVLsfXqg_AtN3Yh1n8';
-const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents`;
+const firebaseConfig = {
+  apiKey: "AIzaSyDofCu66n4Byq1p9bVLsfXqg_AtN3Yh1n8",
+  authDomain: "fun-tools-mg.firebaseapp.com",
+  projectId: "fun-tools-mg",
+  appId: "1:531390892771:web:ab5b369c8fa17944af13d6"
+};
+const firebaseApp = initializeApp(firebaseConfig);
+const auth = getAuth(firebaseApp);
+const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents`;
+
+async function authedFetch(url, options = {}) {
+  const sep = url.includes('?') ? '&' : '?';
+  const urlWithKey = `${url}${sep}key=${firebaseConfig.apiKey}`;
+  const headers = { ...(options.headers || {}) };
+  const user = auth.currentUser;
+  if (user) {
+    headers.Authorization = 'Bearer ' + await user.getIdToken();
+  }
+  return fetch(urlWithKey, { ...options, headers });
+}
 
 const state = {
   player: null, // { name, xp, best, solved, achievements: [] }
@@ -862,23 +914,65 @@ const state = {
   bestStreak: 0
 };
 
-async function loadPlayer(name) {
+async function loadPlayerProfile() {
+  const user = auth.currentUser;
+  if (!user) return null;
   try {
-    const v = localStorage.getItem(STORAGE_PLAYER_PREFIX + name);
-    if (v) return JSON.parse(v);
-  } catch (e) { /* not found */ }
-  return null;
+    const r = await authedFetch(`${FIRESTORE_BASE}/leaderboard/${user.uid}`);
+    if (r.status === 404) return null;
+    if (!r.ok) throw new Error('GET ' + r.status);
+    const doc = await r.json();
+    const f = doc.fields || {};
+    return {
+      uid: user.uid,
+      name: f.name?.stringValue || 'PLAYER',
+      xp: parseInt(f.xp?.integerValue || '0', 10),
+      best: parseInt(f.best?.integerValue || '0', 10),
+      solved: parseInt(f.solved?.integerValue || '0', 10),
+      achievements: (f.achievements?.arrayValue?.values || [])
+        .map(v => v.stringValue).filter(Boolean)
+    };
+  } catch (e) {
+    console.warn('Profile load failed', e);
+    return null;
+  }
 }
 
 async function savePlayer() {
+  const user = auth.currentUser;
+  const p = state.player;
+  if (!user || !p) return;
+  const body = {
+    fields: {
+      name:      { stringValue: p.name },
+      xp:        { integerValue: String(p.xp) },
+      best:      { integerValue: String(p.best) },
+      solved:    { integerValue: String(p.solved) },
+      achievements: {
+        arrayValue: {
+          values: (p.achievements || []).map(a => ({ stringValue: a }))
+        }
+      },
+      updatedAt: { timestampValue: new Date().toISOString() }
+    }
+  };
   try {
-    localStorage.setItem(STORAGE_PLAYER_PREFIX + state.player.name, JSON.stringify(state.player));
-  } catch (e) { console.error(e); }
+    const r = await authedFetch(`${FIRESTORE_BASE}/leaderboard/${user.uid}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!r.ok) {
+      console.warn('Profile save failed:', r.status, await r.text());
+    }
+  } catch (e) {
+    console.warn('Profile save failed', e);
+  }
 }
 
 async function loadLeaderboard() {
   try {
-    const r = await fetch(`${FIRESTORE_BASE}:runQuery?key=${FIREBASE_API_KEY}`, {
+    const r = await authedFetch(`${FIRESTORE_BASE}:runQuery`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -913,61 +1007,128 @@ async function loadLeaderboard() {
   }
 }
 
+// Same Firestore doc holds both the player profile and their leaderboard entry,
+// so updating the leaderboard is the same write as saving the player.
 async function updateLeaderboard() {
-  const p = state.player;
-  const docId = encodeURIComponent(p.name);
-  const body = {
-    fields: {
-      name:      { stringValue: p.name },
-      xp:        { integerValue: String(p.xp) },
-      best:      { integerValue: String(p.best) },
-      solved:    { integerValue: String(p.solved) },
-      updatedAt: { timestampValue: new Date().toISOString() }
-    }
-  };
-  try {
-    const r = await fetch(`${FIRESTORE_BASE}/leaderboard/${docId}?key=${FIREBASE_API_KEY}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    if (!r.ok) {
-      console.warn('Firestore write failed:', r.status, await r.text());
-    }
-  } catch (e) {
-    console.warn('Firestore write failed', e);
-  }
+  await savePlayer();
 }
 
 /* =========================================================
    SCREEN FLOW
    ========================================================= */
 
-async function startGame() {
-  const nameRaw = document.getElementById('player-name').value.trim();
-  if (!nameRaw) {
-    document.getElementById('player-name').style.borderColor = 'var(--danger)';
+async function signInWithGoogle() {
+  try {
+    const provider = new GoogleAuthProvider();
+    await signInWithPopup(auth, provider);
+    // onAuthStateChanged handles the rest
+  } catch (e) { showAuthError(e); }
+}
+
+async function sendEmailLink() {
+  const emailInput = document.getElementById('email-input');
+  const email = emailInput.value.trim();
+  if (!email || !email.includes('@')) {
+    emailInput.style.borderColor = 'var(--danger)';
     return;
   }
-  const name = nameRaw.toUpperCase().slice(0, 14);
-  let p = await loadPlayer(name);
-  if (!p) {
-    p = { name, xp: 0, best: 0, solved: 0, achievements: [] };
+  try {
+    await sendSignInLinkToEmail(auth, email, {
+      url: window.location.origin + window.location.pathname,
+      handleCodeInApp: true
+    });
+    localStorage.setItem(STORAGE_EMAIL_KEY, email);
+    showEmailSent(email);
+  } catch (e) { showAuthError(e); }
+}
+
+async function completeMagicLink() {
+  let email = localStorage.getItem(STORAGE_EMAIL_KEY);
+  if (!email) email = window.prompt('Please confirm your email to complete sign-in:');
+  if (!email) return;
+  try {
+    await signInWithEmailLink(auth, email, window.location.href);
+    localStorage.removeItem(STORAGE_EMAIL_KEY);
+    // Clean magic-link params out of the URL so refresh doesn't retry
+    window.history.replaceState({}, document.title, window.location.pathname);
+  } catch (e) { showAuthError(e); }
+}
+
+function cancelEmailSent() { showSigninOptions(); }
+
+async function signOutNow() {
+  try { await signOut(auth); } catch (e) { console.error(e); }
+}
+
+async function confirmDisplayName() {
+  const input = document.getElementById('display-name-input');
+  const name = (input.value || '').trim().toUpperCase().slice(0, 14);
+  if (!name) {
+    input.style.borderColor = 'var(--danger)';
+    return;
   }
-  state.player = p;
+  const user = auth.currentUser;
+  if (!user) return;
+  state.player = { uid: user.uid, name, xp: 0, best: 0, solved: 0, achievements: [] };
   await savePlayer();
+  enterGame();
+}
+
+function showAuthError(e) {
+  console.error(e);
+  const msg = e?.code ? `Sign-in failed: ${e.code}` : 'Sign-in failed. Please try again.';
+  alert(msg);
+}
+
+function showSigninOptions() {
+  document.getElementById('signin-options').classList.remove('hidden');
+  document.getElementById('email-sent-state').classList.add('hidden');
+  document.getElementById('name-entry-state').classList.add('hidden');
+}
+
+function showEmailSent(email) {
+  document.getElementById('signin-options').classList.add('hidden');
+  document.getElementById('email-sent-state').classList.remove('hidden');
+  document.getElementById('name-entry-state').classList.add('hidden');
+  document.getElementById('email-sent-address').textContent = email;
+}
+
+function showNameEntry(defaultName) {
+  document.getElementById('signin-options').classList.add('hidden');
+  document.getElementById('email-sent-state').classList.add('hidden');
+  document.getElementById('name-entry-state').classList.remove('hidden');
+  const input = document.getElementById('display-name-input');
+  input.value = defaultName;
+  setTimeout(() => input.focus(), 50);
+}
+
+function defaultNameFor(user) {
+  const src = user.displayName || (user.email ? user.email.split('@')[0] : '');
+  return (src || 'PLAYER').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 14) || 'PLAYER';
+}
+
+function enterGame() {
   document.getElementById('signup-screen').classList.add('hidden');
   document.getElementById('game-screen').classList.remove('hidden');
   updateHUD();
   showModeSelect();
 }
 
-function logout() {
-  state.player = null;
+function showSignupScreen() {
   document.getElementById('game-screen').classList.add('hidden');
   document.getElementById('signup-screen').classList.remove('hidden');
-  document.getElementById('player-name').value = '';
+  showSigninOptions();
   renderSignupLeaderboard();
+}
+
+async function onSignedIn(user) {
+  const profile = await loadPlayerProfile();
+  if (profile) {
+    state.player = profile;
+    enterGame();
+  } else {
+    showNameEntry(defaultNameFor(user));
+  }
 }
 
 function updateHUD() {
@@ -1287,12 +1448,31 @@ async function renderSignupLeaderboard() {
   document.getElementById('signup-leaderboard').innerHTML = html;
 }
 
-// init
+// Expose handlers used by inline onclick attributes (module scope is not global).
+Object.assign(window, {
+  signInWithGoogle, sendEmailLink, cancelEmailSent, confirmDisplayName, signOutNow,
+  startMode, showLeaderboard, submitAnswer, selectErrorStep,
+  quitGame, backToModes
+});
+
+// Sign-in state listener — fires on initial load and on every change.
+onAuthStateChanged(auth, async (user) => {
+  if (user) await onSignedIn(user);
+  else showSignupScreen();
+});
+
 document.addEventListener('DOMContentLoaded', () => {
   renderSignupLeaderboard();
-  document.getElementById('player-name').addEventListener('keydown', e => {
-    if (e.key === 'Enter') startGame();
+  document.getElementById('email-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') sendEmailLink();
   });
+  document.getElementById('display-name-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') confirmDisplayName();
+  });
+  // If we arrived via a magic-link email, finish the sign-in.
+  if (isSignInWithEmailLink(auth, window.location.href)) {
+    completeMagicLink();
+  }
 });
 </script>
 </body>
