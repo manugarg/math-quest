@@ -574,17 +574,30 @@ import {
 const rand = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
 const choice = arr => arr[Math.floor(Math.random() * arr.length)];
 
+// Difficulty scales with cumulative XP. Generators widen their number ranges
+// and unlock variants as the tier goes up.
+function difficultyTier() {
+  const xp = (state && state.player && state.player.xp) || 0;
+  if (xp < 200) return 0;
+  if (xp < 600) return 1;
+  if (xp < 1200) return 2;
+  return 3;
+}
+
 /* SET 1 — Basic distribution: a(x ± b) or a(cx ± b) */
 function genSet1() {
-  const a = choice([-6, -5, -4, -3, -2, 2, 3, 4, 5, 6]);
-  const c = choice([1, 1, 1, 2, 3]); // coefficient on x (usually 1)
-  const b = rand(2, 9);
+  const t = difficultyTier();
+  const a = rand(2, 7 + 2 * t) * choice([-1, 1]);          // |a| up to 7/9/11/13
+  const cChoices = t === 0 ? [1, 1, 2, 3]
+                  : t === 1 ? [1, 2, 3, 4]
+                  : [1, 2, 3, 4, 5];
+  const c = choice(cChoices);
+  const b = rand(2, 10 + 2 * t);
   const sign = choice(['+', '-']);
   const inner = c === 1
     ? `x ${sign} ${b}`
     : `${c}x ${sign} ${b}`;
   const q = `${a}(${inner})`;
-  // compute answer
   const term1 = a * c;
   const term2 = sign === '+' ? a * b : -a * b;
   const ans = formatLinear(term1, term2);
@@ -599,16 +612,20 @@ function genSet1() {
 
 /* SET 2 — Distribute & cancel with fractions: D · (ax/D + b) style */
 function genSet2() {
-  // pick a denominator D, a multiplier M, an inner like (cx/D + k) or two-fraction case
-  const variant = choice(['simple', 'simple', 'mixed', 'twofrac']);
+  const t = difficultyTier();
+  const variants = t === 0 ? ['simple', 'simple', 'mixed', 'twofrac']
+                  : t >= 2 ? ['simple', 'mixed', 'twofrac', 'twofrac']
+                  : ['simple', 'mixed', 'mixed', 'twofrac'];
+  const variant = choice(variants);
 
   if (variant === 'simple') {
     // M · (cx/M + k)  where M cancels with denominator
-    const M = choice([6, 8, 10, 12]);
-    const c = choice([1, 2, 3]);
-    const k = rand(1, 9);
+    const M = choice(t === 0 ? [6, 8, 10, 12]
+                    : t === 1 ? [6, 8, 10, 12, 15, 18]
+                    : [8, 10, 12, 15, 18, 20, 24]);
+    const c = choice(t === 0 ? [1, 2, 3] : t === 1 ? [1, 2, 3, 4] : [2, 3, 4, 5]);
+    const k = rand(1, 9 + 2 * t);
     const sign = choice(['+', '-']);
-    // result = c*x  ±  M*k
     const term1 = c;
     const term2 = sign === '+' ? M * k : -M * k;
     return {
@@ -620,10 +637,10 @@ function genSet2() {
     };
   } else if (variant === 'mixed') {
     // M · (x/d + k) where d divides M
-    const d = choice([2, 3, 4, 5]);
-    const mult = choice([2, 3]);
+    const d = choice(t === 0 ? [2, 3, 4, 5] : [2, 3, 4, 5, 6, 7]);
+    const mult = choice(t === 0 ? [2, 3] : [2, 3, 4]);
     const M = d * mult;
-    const k = rand(1, 8);
+    const k = rand(1, 8 + 2 * t);
     const sign = choice(['+', '-']);
     const term1 = mult;
     const term2 = sign === '+' ? M * k : -M * k;
@@ -636,10 +653,15 @@ function genSet2() {
     };
   } else {
     // M · (x/a ± x/b)
-    const M = choice([6, 12]);
-    const a = M === 6 ? choice([2, 3]) : choice([2, 3, 4, 6]);
-    let b = M === 6 ? choice([2, 3]) : choice([2, 3, 4, 6]);
-    while (b === a) b = M === 6 ? choice([2, 3]) : choice([2, 3, 4, 6]);
+    const M = choice(t === 0 ? [6, 12] : t === 1 ? [6, 12, 15] : [12, 15, 20, 24]);
+    const divisors = M === 6 ? [2, 3]
+                   : M === 12 ? [2, 3, 4, 6]
+                   : M === 15 ? [3, 5]
+                   : M === 20 ? [2, 4, 5, 10]
+                   : [2, 3, 4, 6, 8, 12];
+    const a = choice(divisors);
+    let b = choice(divisors);
+    while (b === a && divisors.length > 1) b = choice(divisors);
     const sign = choice(['+', '-']);
     const t1 = M / a;
     const t2 = sign === '+' ? M / b : -M / b;
@@ -655,18 +677,19 @@ function genSet2() {
 
 /* SET 3 — Clear denominator from an equation */
 function genSet3() {
-  // x/d + k = R  →  multiply both sides by d
-  const d = choice([2, 3, 4, 5, 6]);
-  const cInner = choice([1, 1, 2, 3]);
-  const k = rand(1, 9);
+  const t = difficultyTier();
+  const d = choice(t === 0 ? [2, 3, 4, 5, 6]
+                  : t === 1 ? [2, 3, 4, 5, 6, 7, 8]
+                  : [3, 4, 5, 6, 7, 8, 9, 10]);
+  const cInner = choice(t === 0 ? [1, 1, 2, 3]
+                       : t === 1 ? [1, 2, 3, 4]
+                       : [1, 2, 3, 4, 5]);
+  const k = rand(1, 9 + 2 * t);
   const sign = choice(['+', '-']);
-  const xVal = rand(2, 12);
+  const xVal = rand(2, 12 + 4 * t);
   // form:  cInner*x/d  (sign) k  = R
   const lhsAtX = (cInner * xVal) / d + (sign === '+' ? k : -k);
-  // ensure clean integer R
-  if (!Number.isInteger(lhsAtX)) {
-    return genSet3();
-  }
+  if (!Number.isInteger(lhsAtX)) return genSet3();
   const R = lhsAtX;
   const ansX = xVal;
   const xTerm = cInner === 1 ? `x/${d}` : `${cInner}x/${d}`;
@@ -681,12 +704,13 @@ function genSet3() {
 
 /* BOSS — Mix from all three sets, harder */
 function genBoss() {
+  const t = difficultyTier();
   const r = Math.random();
   if (r < 0.3) {
-    // harder distribution with negative coefficient
-    const a = choice([-12, -10, -8, 8, 10, 12]);
-    const c = choice([2, 3, 4]);
-    const b = rand(3, 12);
+    // harder distribution with bigger coefficient — also scales with tier
+    const a = rand(8 + 2 * t, 14 + 3 * t) * choice([-1, 1]);
+    const c = choice(t === 0 ? [2, 3, 4] : [2, 3, 4, 5]);
+    const b = rand(3, 12 + 3 * t);
     const sign = choice(['+', '-']);
     const t1 = a * c;
     const t2 = sign === '+' ? a * b : -a * b;
