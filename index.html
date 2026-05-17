@@ -1328,6 +1328,7 @@ function stopTimer() {
 function showQuestion() {
   const q = state.mode === 'timed' ? pickTimedQuestion() : state.questions[state.currentIdx];
   state.currentQ = q;
+  state.submitted = false;
   document.getElementById('feedback-area').innerHTML = '';
   if (state.mode === 'error') {
     renderErrorQuestion(q);
@@ -1378,6 +1379,8 @@ function escapeHTML(s) {
 }
 
 function selectErrorStep(idx) {
+  if (state.submitted) return;
+  state.submitted = true;
   const q = state.currentQ;
   const steps = document.querySelectorAll('.step');
   steps.forEach(s => s.classList.remove('selected'));
@@ -1393,11 +1396,13 @@ function selectErrorStep(idx) {
 }
 
 function submitAnswer() {
+  if (state.submitted) return;
   const q = state.currentQ;
   const inp = document.getElementById('answer');
   if (!inp) return;
   const userAns = normalize(inp.value);
   if (!userAns) return;
+  state.submitted = true;
   const correct = q.accepted.some(a => normalize(a) === userAns);
   handleResult(correct, q.explanation, q.answer);
 }
